@@ -21,18 +21,32 @@ wheels/
 *.egg
 MANIFEST
 
+# Testing & Linting Caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
 # Virtual environments
 venv/
 ENV/
 env/
 .venv/
 
-# IDE
+# IDE & Editors
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+
+# AI Agent Configurations
+.gemini/
+.agent/
+.agents/
+AGENTS.md
+CLAUDE.md
 
 # OS
 .DS_Store
@@ -46,6 +60,7 @@ logs/
 .env
 .env.local
 .env.*.local
+*.env.production
 
 # Database
 *.db
@@ -73,31 +88,7 @@ podman-compose.lock.yml
 secrets/
 credentials/
 *.json.enc
-*.env.production
 
 # Uploads
 uploads/
 public/
-
-# Generated files
-*.pyc
-*.pyo
-*.pyd
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-AGENTS.md
-MANIFEST

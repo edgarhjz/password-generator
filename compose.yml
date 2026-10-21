@@ -1,36 +1,40 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "5001:5001"
+      - "127.0.0.1:5001:5001"
     environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
-    volumes:
-      - ./backend:/app
-      - /app/__pycache__
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
     networks:
       - password-gen-network
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "3000:8080"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     networks:
       - password-gen-network
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   password-gen-network:

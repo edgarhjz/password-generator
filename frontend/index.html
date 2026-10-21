@@ -55,6 +55,7 @@
             border-radius: 8px;
             outline: none;
             transition: border-color 0.3s;
+            font-family: monospace;
         }
 
         .password-display input:focus {
@@ -75,6 +76,18 @@
 
         .password-display .copy-btn:hover {
             background: #5568d3;
+        }
+
+        .error-banner {
+            display: none;
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-align: center;
         }
 
         .options {
@@ -214,40 +227,42 @@
 <body>
     <div class="container">
         <h1>🔐 Password Generator</h1>
-        
+
+        <div id="errorBanner" class="error-banner" role="alert"></div>
+
         <div class="password-display">
-            <input type="text" id="password" readonly placeholder="Your password will appear here">
-            <button class="copy-btn" onclick="copyPassword()">📋 Copy Password</button>
+            <input type="text" id="password" readonly placeholder="Your password will appear here" aria-label="Generated Password">
+            <button type="button" class="copy-btn" id="copyBtn">📋 Copy Password</button>
         </div>
 
         <div class="options">
             <div class="option-group">
-                <label>Password Length</label>
-                <input type="range" id="length" min="4" max="64" value="16" oninput="updateLengthDisplay()">
+                <label for="length">Password Length</label>
+                <input type="range" id="length" min="4" max="64" value="16">
                 <span class="value" id="lengthValue">16</span>
             </div>
 
             <div class="checkbox-group">
                 <label>
-                    <input type="checkbox" id="uppercase" checked onchange="generatePassword()">
+                    <input type="checkbox" id="uppercase" class="char-option" checked>
                     <span>Uppercase (A-Z)</span>
                 </label>
                 <label>
-                    <input type="checkbox" id="lowercase" checked onchange="generatePassword()">
+                    <input type="checkbox" id="lowercase" class="char-option" checked>
                     <span>Lowercase (a-z)</span>
                 </label>
                 <label>
-                    <input type="checkbox" id="numbers" checked onchange="generatePassword()">
+                    <input type="checkbox" id="numbers" class="char-option" checked>
                     <span>Numbers (0-9)</span>
                 </label>
                 <label>
-                    <input type="checkbox" id="symbols" onchange="generatePassword()">
+                    <input type="checkbox" id="symbols" class="char-option">
                     <span>Symbols (!@#$)</span>
                 </label>
             </div>
         </div>
 
-        <button class="generate-btn" onclick="generatePassword()">Generate Password</button>
+        <button type="button" class="generate-btn" id="generateBtn">Generate Password</button>
 
         <div class="validate-section">
             <h3>Password Strength</h3>
@@ -260,13 +275,43 @@
         const lengthInput = document.getElementById('length');
         const lengthValue = document.getElementById('lengthValue');
         const passwordInput = document.getElementById('password');
+        const copyBtn = document.getElementById('copyBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const errorBanner = document.getElementById('errorBanner');
+        const checkboxes = Array.from(document.querySelectorAll('.char-option'));
 
-        function updateLengthDisplay() {
-            lengthValue.textContent = lengthInput.value;
+        function showError(message) {
+            if (!message) {
+                errorBanner.style.display = 'none';
+                errorBanner.textContent = '';
+                return;
+            }
+            errorBanner.textContent = message;
+            errorBanner.style.display = 'block';
+        }
+
+        function renderValidation(validationData) {
+            const scoreElement = document.getElementById('score');
+            const feedbackElement = document.getElementById('feedback');
+
+            scoreElement.textContent = `${validationData.score}/${validationData.max_score}`;
+            scoreElement.className = 'score ' + (
+                validationData.score >= 4 ? 'good' :
+                validationData.score >= 2 ? 'medium' : 'bad'
+            );
+
+            feedbackElement.innerHTML = '';
+            (validationData.feedback || []).forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'feedback-item ' + (item === 'Password too short' ? 'bad' : 'good');
+                div.textContent = item;
+                feedbackElement.appendChild(div);
+            });
         }
 
         async function generatePassword() {
-            const length = parseInt(lengthInput.value);
+            showError('');
+            const length = parseInt(lengthInput.value, 10);
             const useUppercase = document.getElementById('uppercase').checked;
             const useLowercase = document.getElementById('lowercase').checked;
             const useNumbers = document.getElementById('numbers').checked;
@@ -275,9 +320,7 @@
             try {
                 const response = await fetch('/api/generate', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         length,
                         use_uppercase: useUppercase,
@@ -289,61 +332,74 @@
 
                 const data = await response.json();
 
-                if (data.success) {
-                    passwordInput.value = data.password;
-                    validatePassword(data.password);
+                if (!response.ok || !data.success) {
+                    showError(data.error || 'Failed to generate password.');
+                    return;
+                }
+
+                passwordInput.value = data.password;
+                if (data.validation) {
+                    renderValidation(data.validation);
                 } else {
-                    alert('Error: ' + data.error);
+                    await validatePassword(data.password);
                 }
             } catch (error) {
                 console.error('Error generating password:', error);
-                alert('Failed to generate password. Please try again.');
+                showError('Failed to connect to the server. Please try again.');
             }
         }
 
-        function validatePassword(password) {
-            fetch('/api/validate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                const scoreElement = document.getElementById('score');
-                const feedbackElement = document.getElementById('feedback');
-                
-                scoreElement.textContent = `${data.score}/${data.max_score}`;
-                scoreElement.className = 'score ' + (data.score >= 4 ? 'good' : data.score >= 2 ? 'medium' : 'bad');
-                
-                feedbackElement.innerHTML = '';
-                data.feedback.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'feedback-item ' + (item === 'Password too short' ? 'bad' : 'good');
-                    div.textContent = item;
-                    feedbackElement.appendChild(div);
+        async function validatePassword(password) {
+            try {
+                const response = await fetch('/api/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
                 });
-            });
+                if (!response.ok) return;
+                const data = await response.json();
+                renderValidation(data);
+            } catch (error) {
+                console.error('Error validating password:', error);
+            }
         }
 
-        function copyPassword() {
+        async function copyPassword() {
             const password = passwordInput.value;
-            if (password) {
-                navigator.clipboard.writeText(password).then(() => {
-                    const btn = document.querySelector('.copy-btn');
-                    const originalText = btn.textContent;
-                    btn.textContent = '✅ Copied!';
-                    setTimeout(() => {
-                        btn.textContent = originalText;
-                    }, 2000);
-                }).catch(err => {
-                    alert('Failed to copy password');
-                });
+            if (!password) return;
+
+            try {
+                await navigator.clipboard.writeText(password);
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                showError('Failed to copy password to clipboard.');
             }
         }
 
-        // Generate on page load
+        lengthInput.addEventListener('input', () => {
+            lengthValue.textContent = lengthInput.value;
+        });
+
+        lengthInput.addEventListener('change', generatePassword);
+        generateBtn.addEventListener('click', generatePassword);
+        copyBtn.addEventListener('click', copyPassword);
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const checkedCount = checkboxes.filter(cb => cb.checked).length;
+                if (checkedCount === 0) {
+                    e.target.checked = true;
+                    showError('At least one character type must remain selected.');
+                    return;
+                }
+                generatePassword();
+            });
+        });
+
         window.addEventListener('DOMContentLoaded', generatePassword);
     </script>
 </body>
